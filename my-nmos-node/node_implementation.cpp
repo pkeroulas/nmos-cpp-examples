@@ -1,5 +1,6 @@
 #include "node_implementation.h"
 
+#include <boost/algorithm/string/join.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 #include <boost/range/algorithm/find.hpp>
 #include <boost/range/algorithm/find_first_of.hpp>
@@ -106,7 +107,13 @@ namespace impl
         // video/raw
         const port video{ U("v") };
         // audio/L24
-        const port audio{ U("a") };
+        const port audio1{ U("a1") };
+        // audio/L24
+        const port audio2{ U("a2") };
+        // audio/L24
+        const port audio3{ U("a3") };
+        // audio/L24
+        const port audio4{ U("a4") };
         // video/smpte291
         const port data{ U("d") };
         // video/SMPTE2022-6
@@ -121,8 +128,8 @@ namespace impl
         // example number/enum event
         const port catcall{ U("c") };
 
-        const std::vector<port> rtp{ video, audio, data, mux };
-        const std::vector<port> ws{ temperature, burn, nonsense, catcall };
+        const std::vector<port> rtp{ video, audio1, audio2, audio3, audio4, data };
+        const std::vector<port> ws{ };
         const std::vector<port> all{ boost::copy_range<std::vector<port>>(boost::range::join(rtp, ws)) };
     }
 
@@ -301,10 +308,15 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
 
     // example device
     {
-        auto sender_ids = impl::make_ids(seed_id, nmos::types::sender, impl::ports::rtp, how_many);
+        auto sender_ids = impl::make_ids(seed_id, nmos::types::sender, impl::ports::rtp, 0); // 0 means no senders
         if (0 <= nmos::fields::events_port(model.settings)) boost::range::push_back(sender_ids, impl::make_ids(seed_id, nmos::types::sender, impl::ports::ws, how_many));
         auto receiver_ids = impl::make_ids(seed_id, nmos::types::receiver, impl::ports::all, how_many);
         if (!insert_resource_after(delay_millis, model.node_resources, nmos::make_device(device_id, node_id, sender_ids, receiver_ids, model.settings), gate)) throw node_implementation_init_exception();
+
+        //CBC debug
+        std::string joined = boost::algorithm::join(receiver_ids, ", ");
+        slog::log<slog::severities::severe>(gate, SLOG_FLF) << "PPPPPPPPPPPPPPPPPPPP";
+        slog::log<slog::severities::severe>(gate, SLOG_FLF) << joined;
     }
 
     // example sources, flows and senders
@@ -321,7 +333,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
             {
                 source = nmos::make_video_source(source_id, device_id, nmos::clock_names::clk0, frame_rate, model.settings);
             }
-            else if (impl::ports::audio == port)
+            else if ((impl::ports::audio1 == port) || (impl::ports::audio2 == port) || (impl::ports::audio3 == port) || (impl::ports::audio4 == port))
             {
                 const auto channels = boost::copy_range<std::vector<nmos::channel>>(boost::irange(0, channel_count) | boost::adaptors::transformed([&](const int& index)
                 {
@@ -351,7 +363,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
                     model.settings
                 );
             }
-            else if (impl::ports::audio == port)
+            else if ((impl::ports::audio1 == port) || (impl::ports::audio2 == port) || (impl::ports::audio3 == port) || (impl::ports::audio4 == port))
             {
                 flow = nmos::make_raw_audio_flow(flow_id, source_id, device_id, 48000, 24, model.settings);
                 // add optional grain_rate
@@ -433,7 +445,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
                 });
                 receiver.data[nmos::fields::version] = receiver.data[nmos::fields::caps][nmos::fields::version] = value(nmos::make_version());
             }
-            else if (impl::ports::audio == port)
+            else if ((impl::ports::audio1 == port) || (impl::ports::audio2 == port) || (impl::ports::audio3 == port) || (impl::ports::audio4 == port))
             {
                 receiver = nmos::make_audio_receiver(receiver_id, device_id, nmos::transports::rtp, interface_names, 24, model.settings);
                 // add some example constraint sets; these should be completed fully!
@@ -627,7 +639,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
         const auto name = U("IP Input ") + stri;
         const auto description = U("SMPTE 2110-30 IP Input ") + stri;
 
-        const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, impl::ports::audio, index);
+        const auto receiver_id = impl::make_id(seed_id, nmos::types::receiver, impl::ports::audio1, index);
         const auto parent = std::pair<nmos::id, nmos::type>(receiver_id, nmos::types::receiver);
 
         const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, channel_count) | boost::adaptors::transformed([&](const int& index)
@@ -651,7 +663,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
         const auto name = U("IP Output ") + stri;
         const auto description = U("SMPTE 2110-30 IP Output ") + stri;
 
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, index);
+        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio1, index);
 
         const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, channel_count) | boost::adaptors::transformed([&](const int& index)
         {
@@ -696,7 +708,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
         const auto name = U("Gizmo Output X");
         const auto description = U("Gizmo Output X");
 
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, how_many);
+        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio1, how_many);
 
         const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, input_block_size) | boost::adaptors::transformed([](const int& index)
         {
@@ -720,7 +732,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
     // example source for some audio gizmo
 
     {
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, how_many);
+        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio1, how_many);
 
         const auto channels = boost::copy_range<std::vector<nmos::channel>>(boost::irange(0, input_block_size) | boost::adaptors::transformed([](const int& index)
         {
@@ -728,7 +740,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
         }));
 
         auto source = nmos::make_audio_source(source_id, device_id, nmos::clock_names::clk0, frame_rate, channels, model.settings);
-        impl::set_label_description(source, impl::ports::audio, how_many);
+        impl::set_label_description(source, impl::ports::audio1, how_many);
 
         if (!insert_resource_after(delay_millis, model.node_resources, std::move(source), gate)) throw node_implementation_init_exception();
     }
@@ -742,7 +754,7 @@ void node_implementation_init(nmos::node_model& model, slog::base_gate& gate)
         const auto description = U("Gizmo Input X");
 
         // the audio gizmo is re-entrant
-        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio, how_many);
+        const auto source_id = impl::make_id(seed_id, nmos::types::source, impl::ports::audio1, how_many);
         const auto parent = std::pair<nmos::id, nmos::type>(source_id, nmos::types::source);
 
         const auto channel_labels = boost::copy_range<std::vector<utility::string_t>>(boost::irange(0, input_block_size) | boost::adaptors::transformed([](const int& index)
